@@ -1,1 +1,72 @@
-# vet-notes
+# Veterinary Discharge Instructions Agent
+
+An AI agent that drafts owner discharge instructions from a veterinary case summary and the doctor's discharge orders. It reports what is in the record and flags gaps for the doctor. It never prescribes, and every output is a draft for doctor approval.
+
+Built by a Licensed Veterinary Technician with 15+ years of emergency and critical care experience. The clinical rules, test cases, and expected answers come from that experience.
+
+## Why
+
+Discharge instructions are rewritten by hand from information already in the record, often during shift change. Every rewrite is a chance to drop a medication, copy a dose wrong, or leak an internal staff note into the owner's copy. This project automates the first draft while keeping the riskiest part, medications, under a check done by code rather than trust in the model.
+
+## How it works
+
+```mermaid
+flowchart LR
+    T1[Protocol lookup] <-->|tool call| A
+    T2[Orders lookup] <-->|tool call| A
+    S[Case summary] --> A[Claude drafts]
+    A --> C{Meds match orders?}
+    C -->|yes| D[Doctor approves]
+    C -->|no| R[Revise or block]
+    R -->|send back| A
+    D -->|approved| O[Owner copy]
+```
+
+1. **Agent with tools.** Claude (Anthropic API, `claude-sonnet-5`) receives the case summary and decides on its own to call two tools: one fetches the doctor's discharge orders, one fetches the clinic's standard aftercare protocol for the procedure.
+2. **Rules.** A system prompt sets a chain of authority: doctor's orders, then clinic protocol, then anything staff did on the floor. The agent never adds, removes, or changes a drug, dose, or frequency.
+3. **Code check.** Plain Python confirms every ordered medication line appears word for word in the owner instructions, and that no drug from a watch list appears unless it was ordered. A failed draft goes back to Claude once with the exact problem; if it fails again, it is blocked.
+4. **Output.** A numbered staff review for the doctor, followed by owner instructions in plain language.
+
+Full requirements, guardrails, and the evaluation plan are in [PRD.md](PRD.md).
+
+## Results (first evaluation run)
+
+| Test | Result |
+| --- | --- |
+| Boxer going to euthanasia | Pass: no owner instructions; decision reported; missing details flagged |
+| Cat with pneumonia, stopped drugs in the record | Pass: only the three ordered oral medications appeared |
+| Great Dane after TPLO, trazodone frequency missing | Pass: placeholder used and flagged; no frequency invented |
+| Great Dane, e-collar removed in hospital | Pass: protocol followed for owner; conflict flagged for the doctor |
+| Great Dane with gabapentin removed | Pass: flagged that no pain medication was going home |
+| Fake draft with a 60 mg dose and an unordered drug | Pass: code check caught both |
+
+Every medication line matched the doctor's orders, and no unordered drug reached an owner. In one run, the code check caught Claude altering a medication line, sent it back, and the corrected draft passed.
+
+## Known limitations
+
+- Prompt rules are followed most of the time, not every time, and the same input can produce different wording on each run. Medications are verified by code; the staff review is not, so it still needs a human reading it.
+- The staff review sometimes includes unnecessary notes, and one run contained a factual slip (describing a single TPLO as bilateral).
+- The pain medication check cannot tell whether an in-hospital drug was used for pain or sedation, so it may flag medical cases unnecessarily. It deliberately errs toward flagging.
+- How strictly protocol wording must be followed is a clinic or doctor preference. This version allows simplified wording, which occasionally softens a point.
+
+## Data and privacy
+
+All cases, orders, and protocols are fictional. No real patient records were used. Real records should never be sent to an outside AI service without the hospital's approval.
+
+## Running it
+
+The notebook runs on Kaggle or locally with Python 3.
+
+1. `pip install anthropic`
+2. Provide an Anthropic API key: on Kaggle, as a secret named `ANTHROPIC_API_KEY`; locally, as an environment variable. Never commit the key.
+3. Run the notebook top to bottom. The last cells run all test cases and the fake-draft check.
+
+## Repository contents
+
+- `vet_discharge_agent.ipynb`: the agent, tools, code check, and evaluation runs
+- `PRD.md`: product requirements document
+- `README.md`: this file
+
+## Future work
+
+Additional procedure protocols, a Streamlit interface for technicians, and transcript-to-summary extraction graded against technician-written summaries. Checking a doctor's plan against standard of care is out of scope and would require veterinary oversight.
