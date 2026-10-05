@@ -29,7 +29,17 @@ flowchart LR
 
 Full requirements, guardrails, and the evaluation plan are in [PRD.md](PRD.md).
 
-## Results (first evaluation run)
+## Version 2: from a rounds recording (web app)
+
+Version 2 adds a step in front of the discharge agent and wraps everything in a Streamlit app.
+
+1. **Extraction.** A speech-to-text transcript of morning rounds goes in, with no speaker labels, conversation that jumps between patients, hedged statements, and mistranscribed drug names. Claude sorts every statement to the right patient on the census and fills in a structured handoff summary for each. It never resolves uncertainty silently: hedges are flagged with the exact words, possible speech-to-text errors are flagged rather than corrected, and statements it can't place are set aside instead of guessed.
+2. **Discharge drafts.** Each summary feeds the version 1 agent, so the same tools, rules, and medication check apply. Transcription flags carry into the staff review.
+3. **Accuracy check.** Code grades the extracted summaries against summaries written by a credentialed veterinary technician from the same recording. A critical error is a fact on the wrong patient or an unconfirmed detail recorded as fact.
+
+The planted tests include a detail about one patient mentioned in the middle of another, a hedge later confirmed by the doctor, a hedge never confirmed (a guessed trazodone frequency), a mistranscribed drug name, a decision given at the very end of rounds, and an ambiguous "her" with two female patients.
+
+## Results (version 1 evaluation run)
 
 | Test | Result |
 | --- | --- |
@@ -55,18 +65,21 @@ All cases, orders, and protocols are fictional. No real patient records were use
 
 ## Running it
 
-The notebook runs on Kaggle or locally with Python 3.
+**The app:** `pip install -r requirements.txt`, set `ANTHROPIC_API_KEY` (and optionally `APP_PASSWORD`) as environment variables or in `.streamlit/secrets.toml` (see the example file), then `streamlit run app.py`. Never commit the real secrets file.
 
-1. `pip install anthropic`
-2. Provide an Anthropic API key: on Kaggle, as a secret named `ANTHROPIC_API_KEY`; locally, as an environment variable. Never commit the key.
-3. Run the notebook top to bottom. The last cells run all test cases and the fake-draft check.
+**The version 1 notebook:** runs on Kaggle with the key stored as a Kaggle secret named `ANTHROPIC_API_KEY`. Run it top to bottom; the last cells run all test cases and the fake-draft check.
 
 ## Repository contents
 
-- `vet_discharge_agent.ipynb`: the agent, tools, code check, and evaluation runs
+- `app.py`: the Streamlit app
+- `extract.py`: rounds transcript to per-patient summaries
+- `agent.py`: the discharge agent, tools, and medication check
+- `grade.py`: grades extraction against the technician-written answer keys
+- `records.py`: the fictional census, orders, protocols, and answer keys
+- `data/rounds_transcript.txt`: the fictional rounds recording
+- `vet_discharge_agent.ipynb`: version 1 notebook with its evaluation runs
 - `PRD.md`: product requirements document
-- `README.md`: this file
 
 ## Future work
 
-Additional procedure protocols, a Streamlit interface for technicians, and transcript-to-summary extraction graded against technician-written summaries. Checking a doctor's plan against standard of care is out of scope and would require veterinary oversight.
+Shift handoff and doctor summary outputs from the same extracted summaries, and more procedure protocols. Checking a doctor's plan against standard of care is out of scope and would require veterinary oversight.
