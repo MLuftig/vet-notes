@@ -2,6 +2,8 @@
 
 An AI agent that drafts owner discharge instructions from a veterinary case summary and the doctor's discharge orders. It reports what is in the record and flags gaps for the doctor. It never prescribes, and every output is a draft for doctor approval.
 
+**Live demo:** [vet-notes.streamlit.app](https://vet-notes.streamlit.app/) (password-protected to control API costs; access available on request)
+
 Built by a Licensed Veterinary Technician with 15+ years of emergency and critical care experience. The clinical rules, test cases, and expected answers come from that experience.
 
 ## Why
