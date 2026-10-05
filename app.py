@@ -10,6 +10,7 @@ from agent import draft_discharge
 from extract import FIELDS, extract_summaries, summary_to_text
 from grade import grade
 from records import answer_keys, patients
+import ui
 
 st.set_page_config(page_title="Discharge drafting assistant", page_icon="🩺", layout="wide")
 
@@ -36,11 +37,12 @@ def password_ok():
     return False
 
 
-st.title("Discharge drafting assistant")
-st.write(
+ui.apply_style()
+ui.header(
+    "Discharge drafting assistant",
     "Turns a recorded rounds conversation into handoff summaries, then drafts owner "
-    "discharge instructions for the doctor to review. Every patient, order, and protocol "
-    "here is fictional."
+    "discharge instructions for the doctor to review.",
+    "Every patient, order, and protocol here is fictional.",
 )
 
 if not password_ok():
@@ -64,7 +66,8 @@ tab_rec, tab_sum, tab_dc, tab_acc = st.tabs(
 with tab_rec:
     st.write(
         "A speech-to-text transcript of morning rounds. There are no speaker labels, the "
-        "conversation jumps between patients, and some words are mistranscribed."
+        "conversation jumps between patients, and some words are mistranscribed. You can edit "
+        "it to test the tool. Use fictional cases only, never real patient records."
     )
     transcript = st.text_area("Transcript", TRANSCRIPT, height=420)
     if st.button("Extract handoff summaries", type="primary"):
@@ -83,15 +86,10 @@ with tab_sum:
     else:
         for pid, patient in patients.items():
             summary = state.extraction["patients"].get(pid)
-            with st.expander(f"{patient['name']}: {patient['description']}", expanded=True):
-                if not summary:
-                    st.error("No summary was produced for this patient.")
-                    continue
-                for key, label in FIELDS:
-                    st.markdown(f"**{label}:** {summary.get(key, 'Not stated')}")
-                for flag in summary.get("flags", []):
-                    st.warning(f"{flag.get('type', 'flag').replace('_', ' ').capitalize()}: "
-                               f"{flag.get('detail', '')}  \nSaid: \u201c{flag.get('quote', '')}\u201d")
+            if not summary:
+                st.error(f"No summary was produced for {patient['name']}.")
+                continue
+            ui.summary_card(patient["name"], patient["description"], summary, FIELDS)
         unattributed = state.extraction.get("unattributed", [])
         if unattributed:
             st.subheader("Statements not matched to a patient")
@@ -139,7 +137,8 @@ with tab_acc:
     st.write(
         "Grades the extracted summaries against summaries written by a credentialed veterinary "
         "technician from the same recording. A critical error is a fact on the wrong patient or "
-        "an unconfirmed detail recorded as fact."
+        "an unconfirmed detail recorded as fact. The answer keys match the original transcript, "
+        "so scores only mean something if it hasn't been edited."
     )
     if not state.extraction:
         st.info("Extract summaries from the rounds recording first.")
@@ -151,3 +150,5 @@ with tab_acc:
         c1.metric("Tests passed", f"{passed} of {len(results)}")
         c2.metric("Critical errors", critical)
         st.dataframe(pd.DataFrame(results), hide_index=True, use_container_width=True)
+
+ui.footer("Built by Micah Luftig, LVT, MS. Drafts are for doctor review; nothing here prescribes.")
